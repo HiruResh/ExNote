@@ -1,5 +1,3 @@
-// lib/pages/plan_creation_page.dart (FULL CODE)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:exnote/models/plan.dart';
@@ -33,6 +31,13 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
     _updateEndDate(_selectedType);
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _maxAmountController.dispose();
+    super.dispose();
+  }
+
   void _updateEndDate(PlanType type) {
     DateTime end;
     switch (type) {
@@ -43,10 +48,10 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
         end = _startDate.add(const Duration(days: 6));
         break;
       case PlanType.monthly:
+        // Go to the last day of the current month
         end = DateTime(_startDate.year, _startDate.month + 1, 0);
         break;
       case PlanType.custom:
-        // Keep the current end date for custom
         end = _endDate;
         break;
     }
@@ -109,6 +114,8 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                   name: name,
                   amount: amount,
                   description: description,
+                  // Use a unique ID/key for temporary items for editing/deleting before save
+                  id: -1 - _tempItems.length,
                   displayOrder: _orderCounter++,
                 ),
               );
@@ -127,6 +134,21 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
         },
       ),
     );
+  }
+
+  void _deleteItem(PlanItem item) {
+    setState(() {
+      _tempItems.removeWhere((i) => i.id == item.id);
+    });
+    // Re-index after deletion
+    for (int i = 0; i < _tempItems.length; i++) {
+      _tempItems[i] = _tempItems[i].copyWith(displayOrder: i);
+    }
+  }
+
+  void _addAmountToBudget(double amount) {
+    double currentAmount = double.tryParse(_maxAmountController.text) ?? 0.0;
+    _maxAmountController.text = (currentAmount + amount).toStringAsFixed(0);
   }
 
   @override
@@ -149,6 +171,7 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                 validator: (v) => v!.isEmpty ? 'Please enter a name' : null,
               ),
               const SizedBox(height: 16),
+              // --- Budget Field with Quick Select Buttons ---
               TextFormField(
                 controller: _maxAmountController,
                 keyboardType: TextInputType.number,
@@ -160,6 +183,20 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                     ? 'Enter a valid amount'
                     : null,
               ),
+              const SizedBox(height: 8),
+              // Fast Amount Selection Buttons
+              Wrap(
+                spacing: 8.0,
+                children: [500.0, 1000.0, 5000.0, 10000.0]
+                    .map(
+                      (amount) => ActionChip(
+                        label: Text('+ Rs.${amount.toStringAsFixed(0)}'),
+                        onPressed: () => _addAmountToBudget(amount),
+                      ),
+                    )
+                    .toList(),
+              ),
+              // --- End Budget Field ---
               const SizedBox(height: 20),
 
               // Plan Type Selection
@@ -189,7 +226,9 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                 subtitle: Text(
                   '${_startDate.toIso8601String().split('T').first} to ${_endDate.toIso8601String().split('T').first}',
                 ),
-                trailing: const Icon(Icons.calendar_month),
+                trailing: _selectedType == PlanType.custom
+                    ? const Icon(Icons.edit)
+                    : const Icon(Icons.calendar_month),
                 onTap: _selectedType == PlanType.custom
                     ? _selectDateRange
                     : null,
@@ -197,26 +236,22 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
               const Divider(),
               const SizedBox(height: 10),
 
-              // Planned Items List
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Planned Expenses',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => _showAddItemModal(),
-                  ),
-                ],
+              // Planned Items List Header
+              Text(
+                'Planned Expenses',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 10),
 
+              // Planned Items List
               _tempItems.isEmpty
                   ? const Center(
-                      child: Text(
-                        'Add cards for individual expenses (e.g., Flight, Dinner).',
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20.0),
+                        child: Text(
+                          'Add cards for individual expenses (e.g., Flight, Dinner).',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     )
                   : ReorderableListView.builder(
@@ -224,29 +259,62 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _tempItems.length,
                       onReorder: (int oldIndex, int newIndex) {
-                        if (oldIndex < newIndex) {
-                          newIndex -= 1;
-                        }
-                        final item = _tempItems.removeAt(oldIndex);
-                        _tempItems.insert(newIndex, item);
-                        // Re-index display order
-                        for (int i = 0; i < _tempItems.length; i++) {
-                          _tempItems[i] = _tempItems[i].copyWith(
-                            displayOrder: i,
-                          );
-                        }
+                        setState(() {
+                          if (oldIndex < newIndex) {
+                            newIndex -= 1;
+                          }
+                          final item = _tempItems.removeAt(oldIndex);
+                          _tempItems.insert(newIndex, item);
+                          // Re-index display order
+                          for (int i = 0; i < _tempItems.length; i++) {
+                            _tempItems[i] = _tempItems[i].copyWith(
+                              displayOrder: i,
+                            );
+                          }
+                        });
                       },
                       itemBuilder: (context, index) {
                         final item = _tempItems[index];
                         return Dismissible(
-                          key: ValueKey(item.name + index.toString()),
+                          key: ValueKey(item.id), // Use the unique temp ID/key
                           direction: DismissDirection.endToStart,
-                          background: Container(color: Colors.redAccent),
+                          // Swipe for Edit (instead of delete)
+                          background: Container(
+                            color: Theme.of(context).colorScheme.primary,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            child: const Icon(Icons.edit, color: Colors.white),
+                          ),
+                          confirmDismiss: (direction) async {
+                            if (direction == DismissDirection.endToStart) {
+                              // Perform Edit on swipe
+                              _showAddItemModal(item);
+                              return false; // Don't dismiss the item
+                            }
+                            return true; // Dismiss on any other direction (default behavior)
+                          },
+                          // Secondary background for Delete on left-to-right swipe (Optional)
+                          secondaryBackground: Container(
+                            color: Colors.redAccent,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 20),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
                           onDismissed: (direction) {
-                            setState(() => _tempItems.removeAt(index));
+                            if (direction == DismissDirection.startToEnd) {
+                              _deleteItem(item);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${item.name} deleted.'),
+                                ),
+                              );
+                            }
                           },
                           child: PlanItemCreationTile(
-                            key: ValueKey(item.name + index.toString()),
+                            key: ValueKey(item.id),
                             item: item,
                             onEdit: () => _showAddItemModal(item),
                           ),
@@ -274,6 +342,11 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
             ],
           ),
         ),
+      ),
+      // --- Floating Action Button for Adding Expenses ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddItemModal(),
+        child: const Icon(Icons.add),
       ),
     );
   }

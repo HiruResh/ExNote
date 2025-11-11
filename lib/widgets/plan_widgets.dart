@@ -1,5 +1,3 @@
-// lib/widgets/plan_widgets.dart (FULL CODE)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:exnote/models/plan.dart';
@@ -44,6 +42,14 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
     _descriptionController = TextEditingController(
       text: widget.itemToEdit?.description ?? '',
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   void _saveItem() async {
@@ -165,7 +171,7 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
 
 class PlanItemCreationTile extends StatelessWidget {
   final PlanItem item;
-  final VoidCallback onEdit;
+  final VoidCallback onEdit; // Kept for tap on tile, but swipe is primary edit
 
   const PlanItemCreationTile({
     super.key,
@@ -187,13 +193,15 @@ class PlanItemCreationTile extends StatelessWidget {
               'Rs.${item.amount.toStringAsFixed(2)}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit, size: 20),
-              onPressed: onEdit,
-            ),
+            // The edit button is redundant with the new swipe-to-edit feature.
+            // IconButton(
+            //   icon: const Icon(Icons.edit, size: 20),
+            //   onPressed: onEdit,
+            // ),
             const Icon(Icons.drag_handle, size: 20),
           ],
         ),
+        onTap: onEdit, // Tap also opens edit
       ),
     );
   }
@@ -205,7 +213,7 @@ class PlanItemCreationTile extends StatelessWidget {
 class PlannedItemTile extends StatelessWidget {
   final PlanItem item;
   final Function(bool?) onToggle;
-  final VoidCallback onEdit;
+  final VoidCallback onEdit; // Kept for tap on tile, but swipe is primary edit
 
   const PlannedItemTile({
     super.key,
@@ -222,6 +230,7 @@ class PlannedItemTile extends StatelessWidget {
           ? Theme.of(context).cardColor.withOpacity(0.5)
           : Theme.of(context).cardColor,
       child: ListTile(
+        onTap: onEdit, // Tap also opens edit
         leading: Checkbox(value: item.isCompleted, onChanged: onToggle),
         title: Text(
           item.name,
@@ -243,10 +252,11 @@ class PlannedItemTile extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit, size: 20),
-              onPressed: onEdit,
-            ),
+            // The edit button is redundant with the new swipe-to-edit feature.
+            // IconButton(
+            //   icon: const Icon(Icons.edit, size: 20),
+            //   onPressed: onEdit,
+            // ),
             const Icon(Icons.drag_handle, size: 20),
           ],
         ),
@@ -356,6 +366,217 @@ class _SummaryMetric extends StatelessWidget {
         ),
         Text(label, style: Theme.of(context).textTheme.bodyMedium),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------
+// 5. Edit Plan Modal (New)
+// ---------------------------------------------
+class EditPlanModal extends StatefulWidget {
+  final Plan plan;
+
+  const EditPlanModal({super.key, required this.plan});
+
+  @override
+  State<EditPlanModal> createState() => _EditPlanModalState();
+}
+
+class _EditPlanModalState extends State<EditPlanModal> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _maxAmountController;
+  late PlanType _selectedType;
+  late DateTime _startDate;
+  late DateTime _endDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.plan.name);
+    _maxAmountController = TextEditingController(
+      text: widget.plan.maxAmount.toString(),
+    );
+    _selectedType = widget.plan.type;
+    _startDate = widget.plan.startDate;
+    _endDate = widget.plan.endDate;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _maxAmountController.dispose();
+    super.dispose();
+  }
+
+  void _updateEndDate(PlanType type) {
+    DateTime end;
+    switch (type) {
+      case PlanType.daily:
+        end = _startDate;
+        break;
+      case PlanType.weekly:
+        end = _startDate.add(const Duration(days: 6));
+        break;
+      case PlanType.monthly:
+        end = DateTime(_startDate.year, _startDate.month + 1, 0);
+        break;
+      case PlanType.custom:
+        end = _endDate;
+        break;
+    }
+    setState(() {
+      _selectedType = type;
+      _endDate = end;
+    });
+  }
+
+  Future<void> _selectDateRange() async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+    );
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      });
+    }
+  }
+
+  void _savePlan() async {
+    if (_formKey.currentState!.validate()) {
+      final updatedPlan = widget.plan.copyWith(
+        name: _nameController.text,
+        type: _selectedType,
+        maxAmount: double.parse(_maxAmountController.text),
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+
+      final planProvider = Provider.of<PlanProvider>(context, listen: false);
+      await planProvider.updatePlan(updatedPlan);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Plan updated successfully!')),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  void _addAmountToBudget(double amount) {
+    double currentAmount = double.tryParse(_maxAmountController.text) ?? 0.0;
+    _maxAmountController.text = (currentAmount + amount).toStringAsFixed(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 16.0,
+        right: 16.0,
+        top: 16.0,
+      ),
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Edit Plan Details',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Plan Name'),
+                validator: (v) => v!.isEmpty ? 'Please enter a name' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _maxAmountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Maximum Spending Amount (Rs.)',
+                  prefixIcon: Icon(Icons.money),
+                ),
+                validator: (v) => (v!.isEmpty || double.tryParse(v) == null)
+                    ? 'Enter a valid amount'
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              // Fast Amount Selection Buttons
+              Wrap(
+                spacing: 8.0,
+                children: [500.0, 1000.0, 5000.0, 10000.0]
+                    .map(
+                      (amount) => ActionChip(
+                        label: Text('+ Rs.${amount.toStringAsFixed(0)}'),
+                        onPressed: () => _addAmountToBudget(amount),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+
+              Text(
+                'Plan Duration Type',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Wrap(
+                spacing: 8.0,
+                children: PlanType.values
+                    .map(
+                      (type) => ChoiceChip(
+                        label: Text(type.name.toUpperCase()),
+                        selected: _selectedType == type,
+                        onSelected: (selected) {
+                          if (selected) _updateEndDate(type);
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+
+              ListTile(
+                title: const Text('Plan Period'),
+                subtitle: Text(
+                  '${_startDate.toIso8601String().split('T').first} to ${_endDate.toIso8601String().split('T').first}',
+                ),
+                trailing: _selectedType == PlanType.custom
+                    ? const Icon(Icons.edit)
+                    : const Icon(Icons.calendar_month),
+                onTap: _selectedType == PlanType.custom
+                    ? _selectDateRange
+                    : null,
+              ),
+
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _savePlan,
+                    child: const Text('Update Plan'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
