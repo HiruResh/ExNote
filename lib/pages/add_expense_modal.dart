@@ -1,4 +1,4 @@
-// lib/pages/add_expense_modal.dart
+// lib/pages/add_expense_modal.dart (UPDATED)
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -35,6 +35,21 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
     'Other',
   ];
 
+  // NEW: Pre-defined amount increments
+  final List<int> _amountIncrements = [1, 10, 100, 1000, 10000, 100000];
+
+  // NEW: Pre-defined name suggestions (Title, Category)
+  final List<Map<String, String>> _nameSuggestions = [
+    {'title': 'Lunch', 'category': 'Food'},
+    {'title': 'Snacks', 'category': 'Food'},
+    {'title': 'Coffee', 'category': 'Food'},
+    {'title': 'Bus', 'category': 'Transport'},
+    {'title': 'Train', 'category': 'Transport'},
+    {'title': 'Gas', 'category': 'Transport'},
+    {'title': 'Groceries', 'category': 'Shopping'},
+    {'title': 'Movie', 'category': 'Entertainment'},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +72,28 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
     _amountController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  // NEW: Function to add amount increment
+  void _addAmount(int increment) {
+    setState(() {
+      double currentAmount = double.tryParse(_amountController.text) ?? 0.0;
+      currentAmount += increment;
+      _amountController.text = currentAmount.toStringAsFixed(
+        0,
+      ); // Display as integer if possible
+    });
+  }
+
+  // NEW: Function to apply name/category suggestion
+  void _applySuggestion(String title, String category) {
+    setState(() {
+      _nameController.text = title;
+      // Only change category if the suggested category exists in the list
+      if (_categories.contains(category)) {
+        _selectedCategory = category;
+      }
+    });
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -121,6 +158,8 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 20),
+
+              // --- 1. Title/Name Input and Suggestion Buttons ---
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -129,7 +168,28 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
                 validator: (value) =>
                     value!.isEmpty ? 'Please enter a title' : null,
               ),
+
+              const SizedBox(height: 8),
+              // NEW: Name Suggestion Buttons
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _nameSuggestions.map((suggestion) {
+                  return ActionChip(
+                    label: Text(
+                      '${suggestion['title']!} (${suggestion['category']!})',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () => _applySuggestion(
+                      suggestion['title']!,
+                      suggestion['category']!,
+                    ),
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 10),
+
+              // --- 2. Amount Input and Increment Buttons ---
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
@@ -142,8 +202,35 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
                     ? 'Enter a valid amount'
                     : null,
               ),
+
+              const SizedBox(height: 8),
+              // NEW: Amount Increment Buttons
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _amountIncrements.map((amount) {
+                  return ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      minimumSize: Size.zero, // Remove minimum size constraint
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () => _addAmount(amount),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: Text(
+                      amount >= 1000
+                          ? '${(amount / 1000).toStringAsFixed(0)}K'
+                          : amount.toString(),
+                    ),
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 10),
-              // NEW DESCRIPTION FIELD
+
+              // --- 3. Description Input ---
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
@@ -153,7 +240,7 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
               ),
               const SizedBox(height: 20),
 
-              // Category Dropdown
+              // --- 4. Category Dropdown ---
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
                 decoration: const InputDecoration(labelText: 'Category'),
@@ -173,7 +260,7 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
               ),
               const SizedBox(height: 20),
 
-              // Date Picker
+              // --- 5. Date Picker ---
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Date'),
@@ -183,6 +270,7 @@ class _AddExpenseModalState extends State<AddExpenseModal> {
               ),
               const SizedBox(height: 30),
 
+              // --- 6. Action Buttons ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
