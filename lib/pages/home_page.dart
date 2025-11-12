@@ -1,4 +1,4 @@
-// lib/pages/home_page.dart (UPDATED with AppBar Design)
+// lib/pages/home_page.dart (COMPLETE CODE)
 import 'package:exnote/pages/add_expense_modal.dart';
 import 'package:exnote/pages/notes_page.dart';
 import 'package:exnote/pages/planner_page.dart';
@@ -78,7 +78,6 @@ class _HomePageState extends State<HomePage> {
         ),
         centerTitle: false, // Title aligned to the start
         elevation: 2.0, // Add subtle elevation
-        // REFRESH BUTTON REMOVED (No actions needed here)
         actions: const [],
       ),
       drawer: const CustomDrawer(),
@@ -120,7 +119,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// Separate widget for the actual home page content (remains the same)
+// Separate widget for the actual home page content
 class _HomeContent extends StatelessWidget {
   const _HomeContent({Key? key}) : super(key: key);
 
@@ -182,7 +181,7 @@ class _HomeContent extends StatelessWidget {
 
         return Column(
           children: [
-            // 1. Upcoming Notes Carousel
+            // 1. Upcoming Notes Carousel (Requires NoteProvider data)
             const UpcomingNotesCarousel(),
 
             // 2. Bar Graph for Daily/Weekly/Monthly Expenses

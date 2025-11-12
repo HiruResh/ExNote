@@ -1,3 +1,4 @@
+// lib/services/database_service.dart (FIXED)
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -20,7 +21,7 @@ class DatabaseService {
     return await openDatabase(
       path,
       version: 1,
-      // FIX: Add onConfigure to enable Foreign Key constraints
+      // Enable Foreign Key constraints
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -83,6 +84,29 @@ CREATE TABLE plan_items (
   FOREIGN KEY (planId) REFERENCES plans (id) ON DELETE CASCADE
   )
 ''');
+  }
+
+  /*
+    Resets the entire application database by dropping all tables and recreating them.
+    This permanently deletes all user data (expenses, notes, plans).
+   */
+  Future<void> resetDatabase() async {
+    final db = await instance.database;
+
+    // Temporarily disable foreign keys to allow dropping tables in any order
+    await db.execute('PRAGMA foreign_keys = OFF');
+
+    // Drop all tables (must drop child tables first, like plan_items)
+    await db.execute('DROP TABLE IF EXISTS plan_items');
+    await db.execute('DROP TABLE IF EXISTS plans');
+    await db.execute('DROP TABLE IF EXISTS notes');
+    await db.execute('DROP TABLE IF EXISTS expenses');
+
+    // Recreate all tables
+    await _createDB(db, 1);
+
+    // Re-enable foreign keys
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future close() async {
