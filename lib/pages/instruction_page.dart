@@ -17,6 +17,11 @@ class InstructionPage extends StatelessWidget {
               'Welcome to ExNote!',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
+            const Divider(height: 10),
+            Text(
+              'Built by -Hirusha',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const Divider(height: 30),
 
             _buildInstructionCard(
@@ -49,6 +54,14 @@ class InstructionPage extends StatelessWidget {
               title: 'Managing Notes',
               content:
                   'The Notes tab is for any reminders or financial planning notes. You can see important upcoming notes in the **carousel** on the Home screen.',
+            ),
+
+            _buildInstructionCard(
+              context,
+              icon: Icons.web,
+              title: 'More Informatio and Updates',
+              content:
+                  'visit https://github.com/HirushaReshan/ExNote for new updates.',
             ),
 
             const SizedBox(height: 20),
