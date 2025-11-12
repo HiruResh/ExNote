@@ -8,14 +8,25 @@ import 'package:exnote/providers/expense_provider.dart';
 enum LineChartFilter { daily, weekly, monthly }
 
 class ExpenseLineChart extends StatefulWidget {
-  const ExpenseLineChart({super.key});
+  final LineChartFilter initialFilter;
+
+  const ExpenseLineChart({
+    super.key,
+    this.initialFilter = LineChartFilter.daily,
+  });
 
   @override
   State<ExpenseLineChart> createState() => _ExpenseLineChartState();
 }
 
 class _ExpenseLineChartState extends State<ExpenseLineChart> {
-  LineChartFilter _currentFilter = LineChartFilter.monthly;
+  late LineChartFilter _currentFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentFilter = widget.initialFilter;
+  }
 
   // Helper to get the correct data based on the filter
   Map<DateTime, double> _getChartData(ExpenseProvider provider) {
@@ -73,25 +84,34 @@ class _ExpenseLineChartState extends State<ExpenseLineChart> {
 
         // Theming
         final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final lineColor = isDarkMode ? Colors.white : Theme.of(context).primaryColor;
-        final gridColor = isDarkMode ? Colors.white10 : Colors.grey.withOpacity(0.3);
+        final lineColor = isDarkMode
+            ? Colors.white
+            : Theme.of(context).primaryColor;
+        final gridColor = isDarkMode
+            ? Colors.white10
+            : Colors.grey.withOpacity(0.3);
         final labelColor = isDarkMode ? Colors.white70 : Colors.black54;
 
         return Column(
           children: [
             // 1. Filter Buttons
             _buildFilterButtons(),
-            
+
             // 2. The Chart
             Container(
-              padding: const EdgeInsets.only(top: 10, right: 20, left: 10, bottom: 10),
+              padding: const EdgeInsets.only(
+                top: 10,
+                right: 20,
+                left: 10,
+                bottom: 10,
+              ),
               height: 200,
               child: LineChart(
                 LineChartData(
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: maxAmount / 5, 
+                    horizontalInterval: maxAmount / 5,
                     getDrawingHorizontalLine: (value) {
                       return FlLine(color: gridColor, strokeWidth: 0.5);
                     },
@@ -121,7 +141,9 @@ class _ExpenseLineChartState extends State<ExpenseLineChart> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 30,
-                        interval: _currentFilter == LineChartFilter.monthly ? 1 : null, // Show all labels for Daily/Weekly
+                        interval: _currentFilter == LineChartFilter.monthly
+                            ? 1
+                            : null,
                         getTitlesWidget: (value, meta) {
                           final index = value.toInt();
                           if (index >= 0 && index < sortedData.length) {
@@ -130,7 +152,10 @@ class _ExpenseLineChartState extends State<ExpenseLineChart> {
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
                                 _getTitle(date),
-                                style: TextStyle(color: labelColor, fontSize: 10),
+                                style: TextStyle(
+                                  color: labelColor,
+                                  fontSize: 10,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             );
@@ -152,18 +177,18 @@ class _ExpenseLineChartState extends State<ExpenseLineChart> {
                   minX: 0,
                   maxX: (sortedData.length - 1).toDouble(),
                   minY: 0,
-                  maxY: maxAmount * 1.1, 
+                  maxY: maxAmount * 1.1,
                   lineBarsData: [
                     LineChartBarData(
                       spots: spots,
-                      // KEY CHANGE 1: Set to false for straight lines
-                      isCurved: false, 
+                      // KEY CHANGE 1: Straight lines
+                      isCurved: false,
                       color: lineColor,
                       barWidth: 3,
                       isStrokeCapRound: true,
-                      // KEY CHANGE 2: Configure dots to be shown
+                      // KEY CHANGE 2: Dots at data points
                       dotData: FlDotData(
-                        show: true, 
+                        show: true,
                         getDotPainter: (spot, percent, barData, index) {
                           return FlDotCirclePainter(
                             radius: 3, // Small dot size
@@ -215,7 +240,9 @@ class _ExpenseLineChartState extends State<ExpenseLineChart> {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           textStyle: MaterialStateProperty.all(const TextStyle(fontSize: 12)),
-          padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 8, vertical: 0)),
+          padding: MaterialStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+          ),
         ),
       ),
     );

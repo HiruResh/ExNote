@@ -17,7 +17,8 @@ class StatisticsPage extends StatefulWidget {
 }
 
 class _StatisticsPageState extends State<StatisticsPage> {
-  StatFilter _currentFilter = StatFilter.monthly;
+  // SET DEFAULT FILTER TO DAILY for Pie Chart and main list
+  StatFilter _currentFilter = StatFilter.daily;
 
   List<Expense> _getFilteredExpenses(ExpenseProvider provider) {
     final now = DateTime.now();
@@ -57,7 +58,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
           return ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
-              // --- 1. Filter Toggle (For Pie Chart) ---
+              // --- 1. Filter Toggle (For Pie Chart - Default Daily) ---
               SegmentedButton<StatFilter>(
                 segments: const <ButtonSegment<StatFilter>>[
                   ButtonSegment<StatFilter>(
@@ -105,7 +106,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
               ),
               const SizedBox(height: 20),
 
-              // --- NEW CHART: Spending Trend (Line Chart with internal filter) ---
+              // --- Line Chart (Default Daily) ---
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -117,15 +118,17 @@ class _StatisticsPageState extends State<StatisticsPage> {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const Divider(),
-                      // Uses internal filters (7 Days/6 Weeks/6 Months)
-                      const ExpenseLineChart(),
+                      // Line chart defaults to Daily (7 Days)
+                      const ExpenseLineChart(
+                        initialFilter: LineChartFilter.daily,
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // --- 3. Economy/Comparison Chart (Bar Chart for Daily Comparison) ---
+              // --- Bar Chart (Default Weekly) ---
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -133,11 +136,17 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Daily Spending (Last 7 Days)',
+                        'Spending Comparison',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const Divider(),
-                      const SizedBox(height: 200, child: ExpenseBarChart()),
+                      // Bar chart defaults to Weekly (6 Weeks)
+                      const SizedBox(
+                        height: 250,
+                        child: ExpenseBarChart(
+                          initialFilter: BarChartFilter.weekly,
+                        ),
+                      ),
                     ],
                   ),
                 ),
