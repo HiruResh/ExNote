@@ -1,11 +1,27 @@
+// lib/widgets/plan_widgets.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:exnote/models/plan.dart';
 import 'package:exnote/models/plan_item.dart';
 import 'package:exnote/providers/plan_provider.dart';
 
+// --- Suggested Items for Autocomplete ---
+const List<String> _itemSuggestions = [
+  'Groceries',
+  'Rent',
+  'Car Payment',
+  'Dinner Out',
+  'Flight Ticket',
+  'Hotel Stay',
+  'New Clothes',
+  'Phone Bill',
+  'Gas/Fuel',
+  'Gym Membership',
+];
+
 // ---------------------------------------------
-// 1. Add/Edit Plan Item Modal
+// 1. Add/Edit Plan Item Modal (UPGRADED: Autocomplete & Quick Amounts)
 // ---------------------------------------------
 class AddPlanItemModal extends StatefulWidget {
   final int planId;
@@ -89,6 +105,11 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
     }
   }
 
+  void _addAmountToItem(double amount) {
+    double currentAmount = double.tryParse(_amountController.text) ?? 0.0;
+    _amountController.text = (currentAmount + amount).toStringAsFixed(0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -112,14 +133,40 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Item Name (e.g., Gas, New Shoes)',
-                ),
-                validator: (v) => v!.isEmpty ? 'Enter name' : null,
+              // --- Autocomplete Text Field for Name ---
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
+                  return _itemSuggestions.where((String option) {
+                    return option.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    );
+                  });
+                },
+                fieldViewBuilder:
+                    (context, textController, focusNode, onFieldSubmitted) {
+                      _nameController = textController;
+                      return TextFormField(
+                        controller: textController,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Item Name (e.g., Gas, New Shoes)',
+                        ),
+                        validator: (v) => v!.isEmpty ? 'Enter name' : null,
+                        onFieldSubmitted: (String value) {
+                          onFieldSubmitted();
+                        },
+                      );
+                    },
+                onSelected: (String selection) {
+                  _nameController.text = selection;
+                },
               ),
               const SizedBox(height: 10),
+
+              // --- Amount Text Field ---
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
@@ -130,6 +177,21 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
                 validator: (v) => (v!.isEmpty || double.tryParse(v) == null)
                     ? 'Enter valid amount'
                     : null,
+              ),
+              const SizedBox(height: 8),
+              // --- Quick Amount Buttons ---
+              Wrap(
+                spacing: 8.0,
+                children: [500.0, 1000.0, 2000.0]
+                    .map(
+                      (amount) => ActionChip(
+                        label: Text('+ Rs.${amount.toStringAsFixed(0)}'),
+                        onPressed: () => _addAmountToItem(amount),
+                        visualDensity: VisualDensity.compact,
+                        labelStyle: const TextStyle(fontSize: 12),
+                      ),
+                    )
+                    .toList(),
               ),
               const SizedBox(height: 10),
               TextFormField(
@@ -171,7 +233,7 @@ class _AddPlanItemModalState extends State<AddPlanItemModal> {
 
 class PlanItemCreationTile extends StatelessWidget {
   final PlanItem item;
-  final VoidCallback onEdit; // Kept for tap on tile, but swipe is primary edit
+  final VoidCallback onEdit;
 
   const PlanItemCreationTile({
     super.key,
@@ -193,11 +255,6 @@ class PlanItemCreationTile extends StatelessWidget {
               'Rs.${item.amount.toStringAsFixed(2)}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            // The edit button is redundant with the new swipe-to-edit feature.
-            // IconButton(
-            //   icon: const Icon(Icons.edit, size: 20),
-            //   onPressed: onEdit,
-            // ),
             const Icon(Icons.drag_handle, size: 20),
           ],
         ),
@@ -213,7 +270,7 @@ class PlanItemCreationTile extends StatelessWidget {
 class PlannedItemTile extends StatelessWidget {
   final PlanItem item;
   final Function(bool?) onToggle;
-  final VoidCallback onEdit; // Kept for tap on tile, but swipe is primary edit
+  final VoidCallback onEdit;
 
   const PlannedItemTile({
     super.key,
@@ -252,11 +309,6 @@ class PlannedItemTile extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            // The edit button is redundant with the new swipe-to-edit feature.
-            // IconButton(
-            //   icon: const Icon(Icons.edit, size: 20),
-            //   onPressed: onEdit,
-            // ),
             const Icon(Icons.drag_handle, size: 20),
           ],
         ),
@@ -266,7 +318,7 @@ class PlannedItemTile extends StatelessWidget {
 }
 
 // ---------------------------------------------
-// 4. Summary Card for Ongoing Plan View
+// 4. Summary Card for Ongoing Plan View (REFACTORED for better layout)
 // ---------------------------------------------
 class PlanSummaryCard extends StatelessWidget {
   final Plan plan;
@@ -284,55 +336,158 @@ class PlanSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spentPercentage = (totalCompleted / plan.maxAmount) * 100;
+    final spentPercentage = plan.maxAmount > 0
+        ? (totalCompleted / plan.maxAmount).clamp(0.0, 1.0)
+        : 0.0;
+    final remainingColor = totalRemaining >= 0
+        ? Colors.green
+        : Colors.deepOrange;
 
     return Card(
       margin: const EdgeInsets.all(16.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(plan.name, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text(
-              'Period: ${plan.type.name.toUpperCase()} | Budget: Rs.${plan.maxAmount.toStringAsFixed(2)}',
-            ),
-            const Divider(height: 20),
-
+            // --- Row 1: Title and Item Count ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SummaryMetric(
-                  label: 'Spent',
-                  amount: totalCompleted,
-                  color: Colors.redAccent,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        plan.name,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Budget: Rs.${plan.maxAmount.toStringAsFixed(0)}',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: remainingColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _SummaryMetric(
-                  label: 'Remaining',
-                  amount: totalRemaining,
-                  color: totalRemaining >= 0 ? Colors.green : Colors.deepOrange,
-                ),
-                _SummaryMetric(
-                  label: 'Items Planned',
-                  amount: totalPlanned,
-                  color: Colors.blueAccent,
+                // --- Top Right: Items Planned Count ---
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        totalPlanned.toStringAsFixed(0),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.blueAccent,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Text(
+                        'Planned',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 15),
 
-            // Progress Bar
+            // --- Row 2: Remaining Card (TOP) ---
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: remainingColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: remainingColor, width: 1.5),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'REMAINING',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: remainingColor,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Rs.${totalRemaining.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.headlineLarge
+                          ?.copyWith(
+                            color: remainingColor,
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // --- Row 3: Spent Card (BELOW) ---
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'TOTAL SPENT',
+                    style: TextStyle(fontSize: 14, color: Colors.redAccent),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'Rs.${totalCompleted.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 30),
+
+            // --- Progress Bar ---
             Text(
-              'Progress: ${spentPercentage.toStringAsFixed(1)}%',
+              'Progress: ${(spentPercentage * 100).toStringAsFixed(1)}%',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: totalCompleted / plan.maxAmount,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                totalRemaining >= 0 ? Colors.green : Colors.red,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                minHeight: 10,
+                value: spentPercentage,
+                backgroundColor: Colors.grey[300],
+                valueColor: AlwaysStoppedAnimation<Color>(remainingColor),
               ),
             ),
           ],
@@ -342,36 +497,8 @@ class PlanSummaryCard extends StatelessWidget {
   }
 }
 
-class _SummaryMetric extends StatelessWidget {
-  final String label;
-  final double amount;
-  final Color color;
-
-  const _SummaryMetric({
-    required this.label,
-    required this.amount,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          'Rs.${amount.toStringAsFixed(2)}',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
-      ],
-    );
-  }
-}
-
 // ---------------------------------------------
-// 5. Edit Plan Modal (New)
+// 5. Edit Plan Modal (Unchanged as it didn't have issues)
 // ---------------------------------------------
 class EditPlanModal extends StatefulWidget {
   final Plan plan;
@@ -389,6 +516,16 @@ class _EditPlanModalState extends State<EditPlanModal> {
   late PlanType _selectedType;
   late DateTime _startDate;
   late DateTime _endDate;
+
+  // Suggested Plan Names for Autocomplete
+  static const List<String> _planNameSuggestions = [
+    'Monthly Groceries',
+    'Vacation Travel Fund',
+    'Home Renovation Budget',
+    'Student Budget',
+    'Weekly Allowance',
+    'Car Maintenance',
+  ];
 
   @override
   void initState() {
@@ -492,12 +629,37 @@ class _EditPlanModalState extends State<EditPlanModal> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 20),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Plan Name'),
-                validator: (v) => v!.isEmpty ? 'Please enter a name' : null,
+              // --- Autocomplete Text Field for Plan Name (Added here too) ---
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
+                  return _planNameSuggestions.where((String option) {
+                    return option.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    );
+                  });
+                },
+                fieldViewBuilder:
+                    (context, textController, focusNode, onFieldSubmitted) {
+                      _nameController = textController;
+                      return TextFormField(
+                        controller: textController,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Plan Name',
+                        ),
+                        validator: (v) =>
+                            v!.isEmpty ? 'Please enter a name' : null,
+                      );
+                    },
+                onSelected: (String selection) {
+                  _nameController.text = selection;
+                },
               ),
               const SizedBox(height: 16),
+              // --- Budget Field with Quick Select Buttons ---
               TextFormField(
                 controller: _maxAmountController,
                 keyboardType: TextInputType.number,
@@ -524,6 +686,7 @@ class _EditPlanModalState extends State<EditPlanModal> {
               ),
               const SizedBox(height: 20),
 
+              // Plan Duration
               Text(
                 'Plan Duration Type',
                 style: Theme.of(context).textTheme.titleMedium,

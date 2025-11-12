@@ -1,9 +1,11 @@
+// lib/pages/plan_creation_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:exnote/models/plan.dart';
 import 'package:exnote/models/plan_item.dart';
 import 'package:exnote/providers/plan_provider.dart';
-import 'package:exnote/widgets/plan_widgets.dart';
+import 'package:exnote/widgets/plan_widgets.dart'; // Imports the updated modal and tile
 
 class PlanCreationPage extends StatefulWidget {
   const PlanCreationPage({super.key});
@@ -22,6 +24,16 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
 
   List<PlanItem> _tempItems = [];
   int _orderCounter = 0; // Tracks the next display order for new items
+
+  // Suggested Plan Names for Autocomplete (Duplicated for PlanCreationPage use)
+  static const List<String> _planNameSuggestions = [
+    'Monthly Groceries',
+    'Vacation Travel Fund',
+    'Home Renovation Budget',
+    'Student Budget',
+    'Weekly Allowance',
+    'Car Maintenance',
+  ];
 
   @override
   void initState() {
@@ -162,15 +174,37 @@ class _PlanCreationPageState extends State<PlanCreationPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText:
-                      'Plan Name (e.g., European Trip Budget, Monthly Food Budget)',
-                ),
-                validator: (v) => v!.isEmpty ? 'Please enter a name' : null,
+              // --- Plan Name with Autocomplete (UPGRADED) ---
+              Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
+                  return _planNameSuggestions.where((String option) {
+                    return option.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    );
+                  });
+                },
+                fieldViewBuilder:
+                    (context, textController, focusNode, onFieldSubmitted) {
+                      _nameController = textController;
+                      return TextFormField(
+                        controller: textController,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Plan Name (e.g., Groceries, Travel Fund)',
+                        ),
+                        validator: (v) =>
+                            v!.isEmpty ? 'Please enter a name' : null,
+                      );
+                    },
+                onSelected: (String selection) {
+                  _nameController.text = selection;
+                },
               ),
               const SizedBox(height: 16),
+
               // --- Budget Field with Quick Select Buttons ---
               TextFormField(
                 controller: _maxAmountController,

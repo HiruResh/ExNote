@@ -1,3 +1,4 @@
+// lib/pages/planner_page.dart
 import 'package:exnote/models/expense.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,7 @@ import 'package:exnote/providers/expense_provider.dart';
 import 'package:exnote/providers/plan_provider.dart';
 import 'package:exnote/pages/plan_creation_page.dart';
 import 'package:exnote/pages/plan_history_page.dart';
-import 'package:exnote/widgets/plan_widgets.dart';
+import 'package:exnote/widgets/plan_widgets.dart'; // Imports the updated widgets
 
 class PlannerPage extends StatelessWidget {
   const PlannerPage({super.key});
@@ -24,7 +25,7 @@ class PlannerPage extends StatelessWidget {
           );
         } else {
           // If no plan is active, show the hub to create/select one
-          return PlannerHubView();
+          return const PlannerHubView();
         }
       },
     );
@@ -35,6 +36,8 @@ class PlannerPage extends StatelessWidget {
 // Hub View (No Active Plan) - MODERN UI
 // ---------------------------------------------
 class PlannerHubView extends StatelessWidget {
+  const PlannerHubView({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -270,7 +273,7 @@ class _OngoingPlanViewState extends State<OngoingPlanView> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Plan Summary Card
+          // Plan Summary Card (Uses the refactored version)
           PlanSummaryCard(
             plan: widget.plan,
             totalPlanned: totalPlanned,
